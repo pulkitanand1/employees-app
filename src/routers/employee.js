@@ -1,13 +1,10 @@
 const express = require("express");
 const { check, validationResult } = require("express-validator");
-const { pgClient } = require("./utils/pgdb");
+const { pgClient } = require("../utils/pgdb");
+const auth = require("../middleware/auth") 
+const router = new express.Router();
 
-const app = express();
-const port = 3001;
-
-app.use(express.json()); // Middleware for json
-
-app.get("/employees", (req, _res) => {
+router.get("/employees", auth, (req, _res) => {
   pgClient.query(
     `select emp_id, name, address, dob, dept from employees where is_deleted = false;`,
     (err, res) => {
@@ -20,7 +17,7 @@ app.get("/employees", (req, _res) => {
   );
 });
 
-app.get("/employees/:empId", (req, res) => {
+router.get("/employees/:empId",auth, async (req, res) => {
   const empId = req.params.empId;
   pgClient.query(
     `select emp_id, name, address, dob, dept from employees where emp_id = ${empId} and is_deleted = false`,
@@ -38,8 +35,9 @@ app.get("/employees/:empId", (req, res) => {
   );
 });
 
-app.post(
+router.post(
   "/employees",
+  auth,
   [
     check("empId")
       .not()
@@ -88,8 +86,9 @@ app.post(
   }
 );
 
-app.put(
+router.put(
   "/employees/:empId",
+  auth,
   [
     check("name").optional(),
     check("address").optional(),
@@ -109,13 +108,13 @@ app.put(
       checkIfEmployeeIdExists(empId, (doesExist) => {
         if (doesExist) {
           const sql = `update employees 
-            set 
-            name = case when '${name}' = '' then name else '${name}' end,
-            address = case when '${address}' = '' then address else '${address}' end,
-            dob = case when '${dob}' = '' then dob else '${dob}' end,
-            dept = case when '${dept}' = '' then dept else '${dept}' end
-            where emp_id = ${empId}
-             and is_deleted = false;`;
+              set 
+              name = case when '${name}' = '' then name else '${name}' end,
+              address = case when '${address}' = '' then address else '${address}' end,
+              dob = case when '${dob}' = '' then dob else '${dob}' end,
+              dept = case when '${dept}' = '' then dept else '${dept}' end
+              where emp_id = ${empId}
+               and is_deleted = false;`;
           pgClient.query(sql, (err, response) => {
             if (!err) {
               res.sendStatus(200);
@@ -151,4 +150,4 @@ checkIfEmployeeIdExists = (empId, callback) => {
   );
 };
 
-app.listen(port, () => console.log(`App is running on port ${port}`));
+module.exports = router;
