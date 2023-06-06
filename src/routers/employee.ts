@@ -1,8 +1,9 @@
-const express = require("express");
-const { check, validationResult } = require("express-validator");
-const { pgClient } = require("../utils/pgdb");
-const auth = require("../middleware/auth") 
-const router = new express.Router();
+import express from "express";
+import { check, validationResult } from "express-validator";
+import pgClient from "../utils/pgdb";
+import auth from "../middleware/auth"; 
+
+const router = express.Router();
 
 router.get("/employees", auth, (req, _res) => {
   pgClient.query(
@@ -21,10 +22,10 @@ router.get("/employees/:empId",auth, async (req, res) => {
   const empId = req.params.empId;
   pgClient.query(
     `select emp_id, name, address, dob, dept from employees where emp_id = ${empId} and is_deleted = false`,
-    (err, { rows } = []) => {
+    (err, result) => {
       if (!err) {
-        if (rows.length > 0) {
-          res.send(rows[0]);
+        if (result.rows.length > 0) {
+          res.send(result.rows[0]);
         } else {
           res.send(`Cannot find any employee with id ${empId}`);
         }
@@ -137,7 +138,7 @@ router.put(
   }
 );
 
-checkIfEmployeeIdExists = (empId, callback) => {
+const checkIfEmployeeIdExists = (empId, callback) => {
   pgClient.query(
     `select 1 from employees where emp_id = ${empId}`,
     (err, { rowCount }) => {
@@ -150,4 +151,5 @@ checkIfEmployeeIdExists = (empId, callback) => {
   );
 };
 
-module.exports = router;
+const employeeRouter = router;
+export  default employeeRouter;

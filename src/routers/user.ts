@@ -1,9 +1,9 @@
-const express = require("express");
-const { check, validationResult } = require("express-validator");
-const { pgClient } = require("../utils/pgdb");
-const auth = require("../utils/authentication");
+import {Router} from "express";
+import { check, validationResult } from "express-validator";
+import pgClient from "../utils/pgdb";
+import * as auth from "../utils/authentication";
 
-const router = new express.Router();
+const router = Router();
 
 router.post(
   "/auth",
@@ -40,4 +40,5 @@ router.post(
   }
 );
 
-module.exports = router;
+const userRouter = router;
+export  default userRouter;

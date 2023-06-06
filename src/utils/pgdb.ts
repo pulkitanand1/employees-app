@@ -1,6 +1,6 @@
-const {Client} = require('pg');
+import Client from "pg";
 
-const pgClient = new Client({
+const pgClient = new Client.Client({
     host: "localhost",
     user: "pguser",
     port: 5432,
@@ -9,5 +9,4 @@ const pgClient = new Client({
 });
 
 pgClient.connect();
-
-module.exports = {pgClient};
+export default pgClient;

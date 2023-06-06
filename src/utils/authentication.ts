@@ -1,14 +1,14 @@
-const jwt = require("jsonwebtoken");
+import jwt from "jsonwebtoken";
 
 const secret = "JWTSecret";
-const generateToken = async (id) => {
+const generateToken = async (id: number) => {
   if (id > 0) {
     const token = jwt.sign({ _id: id }, secret);
     return token;
   }
 };
 
-const verifyToken = async (token) => {
+const verifyToken = async (token: string) => {
   try {
     const data = jwt.verify(token, secret);
     return data;
@@ -16,5 +16,4 @@ const verifyToken = async (token) => {
     console.error(e);
   }
 };
-
-module.exports = { generateToken, verifyToken };
+export {generateToken, verifyToken};
