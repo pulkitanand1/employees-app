@@ -1,39 +1,41 @@
 import express from "express";
 import { check, validationResult } from "express-validator";
-import pgClient from "../utils/pgdb";
-import auth from "../middleware/auth"; 
+import auth from "../middleware/auth";
+import { employees } from "../db/models/employees";
 
 const router = express.Router();
 
-router.get("/employees", auth, (req, _res) => {
-  pgClient.query(
-    `select emp_id, name, address, dob, dept from employees where is_deleted = false;`,
-    (err, res) => {
-      if (!err) {
-        _res.send(res.rows);
-      } else {
-        console.error(err.message);
-      }
-    }
-  );
+router.get("/employees", auth, async (req, _res) => {
+  const emps = await employees.findAll();
+  const data = emps.map(({ dataValues }) => {
+    return {
+      empId: dataValues.id,
+      name: dataValues.name,
+      address: dataValues.address,
+      dob: dataValues.dob,
+      dept: dataValues.dept,
+    };
+  });
+  _res.send(data);
 });
 
-router.get("/employees/:empId",auth, async (req, res) => {
+router.get("/employees/:empId", auth, async (req, res) => {
   const empId = req.params.empId;
-  pgClient.query(
-    `select emp_id, name, address, dob, dept from employees where emp_id = ${empId} and is_deleted = false`,
-    (err, result) => {
-      if (!err) {
-        if (result.rows.length > 0) {
-          res.send(result.rows[0]);
-        } else {
-          res.send(`Cannot find any employee with id ${empId}`);
-        }
-      } else {
-        console.error(err.message);
-      }
-    }
-  );
+  const emps = await employees.findAll({
+    where: {
+      emp_id: empId,
+    },
+  })
+  const data = emps.map(({ dataValues }) => {
+    return {
+      empId: dataValues.id,
+      name: dataValues.name,
+      address: dataValues.address,
+      dob: dataValues.dob,
+      dept: dataValues.dept,
+    };
+  });
+  res.send(data);
 });
 
 router.post(
@@ -62,27 +64,25 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     } else {
       const { empId, name, address, dob, dept } = req.body;
-      checkIfEmployeeIdExists(empId, (isDuplicate) => {
-        if (isDuplicate) {
-          return res.status(400).json({
-            errors: [
-              {
-                msg: "Employee id already exists",
-              },
-            ],
-          });
-        } else {
-          const sql = `insert into employees(emp_id, name, address, dob, dept) values(${empId}, '${name}', '${address}', '${dob}', '${dept}')`;
-          pgClient.query(sql, (err, response) => {
-            if (!err) {
-              res.sendStatus(200);
-            } else {
-              console.error(err.message);
-              res.sendStatus(500);
-            }
-          });
-        }
-      });
+      const isDuplicate = await checkIfEmployeeIdExists(empId);
+      if (isDuplicate) {
+        return res.status(400).json({
+          errors: [
+            {
+              msg: "Employee id already exists",
+            },
+          ],
+        });
+      } else {
+        await employees.create({
+          emp_id: empId,
+          name,
+          address,
+          dob,
+          dept
+        });
+        res.sendStatus(200);
+      }
     }
   }
 );
@@ -99,57 +99,51 @@ router.put(
       .withMessage("Date format should be yyyy-MM-dd"),
     check("dept").optional(),
   ],
-  (req, res) => {
+  async (req, res) => {
     const empId = req.params.empId;
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     } else {
-      const { name = "", address = "", dob = "", dept = "" } = req.body;
-      checkIfEmployeeIdExists(empId, (doesExist) => {
-        if (doesExist) {
-          const sql = `update employees 
-              set 
-              name = case when '${name}' = '' then name else '${name}' end,
-              address = case when '${address}' = '' then address else '${address}' end,
-              dob = case when '${dob}' = '' then dob else '${dob}' end,
-              dept = case when '${dept}' = '' then dept else '${dept}' end
-              where emp_id = ${empId}
-               and is_deleted = false;`;
-          pgClient.query(sql, (err, response) => {
-            if (!err) {
-              res.sendStatus(200);
-            } else {
-              console.error(err.message);
-              res.sendStatus(500);
-            }
-          });
-        } else {
-          return res.status(400).json({
-            errors: [
-              {
-                msg: "Employee id not found",
-              },
-            ],
-          });
+      const { name, address, dob, dept } = req.body;
+      const existingEmployee = await employees.findOne({
+        where: {
+          emp_id: empId
         }
       });
+      if (existingEmployee) {
+        employees.update({
+          name: name ?? existingEmployee.name,
+          address: address ?? existingEmployee.address,
+          dob: dob ?? existingEmployee.dob,
+          dept: dept ?? existingEmployee.dob
+        }, {
+          where: {
+            emp_id: empId
+          }
+        })
+        res.sendStatus(200);
+      } else {
+        return res.status(400).json({
+          errors: [
+            {
+              msg: "Employee id not found",
+            },
+          ],
+        });
+      }
     }
   }
 );
 
-const checkIfEmployeeIdExists = (empId, callback) => {
-  pgClient.query(
-    `select 1 from employees where emp_id = ${empId}`,
-    (err, { rowCount }) => {
-      if (!err) {
-        callback(rowCount > 0);
-      } else {
-        console.error(err.message);
-      }
-    }
-  );
+const checkIfEmployeeIdExists = async (empId: number) => {
+  const emps = await employees.findOne({
+    where: {
+      emp_id: empId,
+    },
+  });
+  return emps != undefined;
 };
 
 const employeeRouter = router;
-export  default employeeRouter;
+export default employeeRouter;
